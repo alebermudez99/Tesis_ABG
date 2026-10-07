@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banco de sintonía PID</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: banco de pruebas de dos columnas (controles a la izquierda, gráficas y verificaciones a la derecha). */
+:root {
+  --bg: #F2F5F3;
+  --surface: #FFFFFF;
+  --surface2: #E8EEEA;
+  --fg: #16211B;
+  --muted: #566860;
+  --line: #CAD5CE;
+  --accent: #00694F;
+  --accent-fg: #FFFFFF;
+  --accent-soft: #D7EAE2;
+  --ref: #66766E;
+  --s2: #2D5FA8;
+  --alt: #B05A00;
+  --ok: #2B7A4B;
+  --warn: #9A5B00;
+  --bad: #B3261E;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1612; --surface: #17211B; --surface2: #1E2B24; --fg: #E5EEE8; --muted: #92A59B;
+    --line: #2D3D34; --accent: #4FBF9C; --accent-fg: #06241A; --accent-soft: #1A3A30;
+    --ref: #8CA096; --s2: #7FB0F0; --alt: #F0A14A; --ok: #5CC98A; --warn: #F0B357; --bad: #FF8A80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1612; --surface: #17211B; --surface2: #1E2B24; --fg: #E5EEE8; --muted: #92A59B;
+  --line: #2D3D34; --accent: #4FBF9C; --accent-fg: #06241A; --accent-soft: #1A3A30;
+  --ref: #8CA096; --s2: #7FB0F0; --alt: #F0A14A; --ok: #5CC98A; --warn: #F0B357; --bad: #FF8A80;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+.app { max-width: 1200px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 56px; }
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; margin-bottom: 16px; }
+h1 { font-size: 22px; line-height: 1.2; font-weight: 600; margin: 0 0 4px; text-wrap: balance; }
+.sub { margin: 0; color: var(--muted); max-width: 62ch; }
+.tabs { display: flex; gap: 4px; background: var(--surface2); padding: 4px; border-radius: 10px; }
+.tabs button { font: inherit; font-weight: 500; border: 0; background: transparent; color: var(--muted); padding: 7px 14px; border-radius: 7px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 0 0 1px var(--line); }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.layout { display: grid; grid-template-columns: minmax(0, 330px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 880px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+fieldset { border: 0; border-top: 1px solid var(--line); margin: 0; padding: 12px 0 4px; min-width: 0; }
+fieldset:first-of-type { border-top: 0; padding-top: 0; }
+legend { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 0 0 8px; float: left; width: 100%; }
+legend + * { clear: both; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) 88px; gap: 2px 8px; align-items: center; margin-bottom: 10px; }
+.row label { font-size: 13px; }
+.row label small { color: var(--muted); font-size: 11px; }
+.row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 0; }
+input[type=number], select { font: inherit; font-family: var(--font-mono); font-size: 13px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px; width: 100%; min-width: 0; }
+select { font-family: var(--font-body); }
+.field { margin-bottom: 10px; }
+.field > label { display: block; font-size: 13px; margin-bottom: 3px; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; margin-bottom: 8px; }
+.check input { margin-top: 3px; accent-color: var(--accent); }
+.hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.presets button { font: inherit; font-size: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); padding: 4px 9px; border-radius: 6px; cursor: pointer; }
+.presets button:hover { border-color: var(--accent); }
+.chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 16px; margin-bottom: 6px; }
+.chart-head h2 { font-size: 14px; font-weight: 600; margin: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 18px; height: 0; border-top: 2px solid; vertical-align: middle; margin-right: 5px; }
+.legend i.dash { border-top-style: dashed; }
+.chartbox { position: relative; }
+canvas { width: 100%; height: 250px; display: block; touch-action: pan-y; }
+canvas.tall { height: 300px; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-family: var(--font-mono); font-size: 11px; white-space: pre; display: none; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 16px; margin: 0; }
+.metrics div { min-width: 0; }
+.metrics dt { font-size: 11px; color: var(--muted); letter-spacing: .02em; }
+.metrics dd { margin: 0; font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+h2.sec { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+.checks { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.checks li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; align-items: start; }
+.badge { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; text-align: center; border-radius: 5px; padding: 2px 0; border: 1px solid currentColor; }
+.badge.ok { color: var(--ok); } .badge.warn { color: var(--warn); } .badge.bad { color: var(--bad); } .badge.na { color: var(--muted); }
+.checks .t { font-weight: 500; }
+.checks .d { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: right; padding: 5px 10px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; font-family: var(--font-body); }
+td { font-family: var(--font-mono); }
+th { font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.inline-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px 12px; margin-bottom: 12px; }
+.inline-inputs label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 2px; }
+details { margin-top: 4px; }
+summary { cursor: pointer; font-weight: 500; }
+pre.eqs { font-family: var(--font-mono); font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; margin: 8px 0 0; line-height: 1.7; }
+.note { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Banco de sintonía PID</h1>
+      <p class="sub">Simula las ecuaciones 3.1 a 3.9 de la tesina: traslación del cuadricóptero con control de altura y la cascada de posición x-y. Mueve las ganancias y revisa si el resultado coincide con la teoría.</p>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Modo">
+      <button role="tab" id="tab-alt" aria-selected="true" aria-controls="view-alt">Altura</button>
+      <button role="tab" id="tab-xy" aria-selected="false" aria-controls="view-xy">Posición x-y</button>
+    </div>
+  </header>
+
+  <!-- ===================== ALTURA ===================== -->
+  <section id="view-alt" role="tabpanel" aria-labelledby="tab-alt">
+    <div class="layout">
+      <div class="panel" id="alt-controls">
+        <div class="presets" aria-label="Ajustes rápidos">
+          <button type="button" data-preset="p">Solo P</button>
+          <button type="button" data-preset="pd">PD (50, 25)</button>
+          <button type="button" data-preset="pid">PID ejemplo</button>
+          <button type="button" data-preset="mask">Máscara (2, 2)</button>
+        </div>
+        <fieldset>
+          <legend>Ley de control</legend>
+          <div class="field">
+            <label for="mode">Versión de la ley</label>
+            <select id="mode">
+              <option value="theory">Teórica, ec. 3.6 (con m·g)</option>
+              <option value="simple">Como en Simulink (sin m·g, ż_d = 0)</option>
+            </select>
+            <p class="hint">La versión Simulink usa T = m·(−Kp·e − Kd·ė − Ki·∫e) y deja un offset g/Kp si no hay integral.</p>
+          </div>
+          <div class="row"><label for="Kp">Kp <small>proporcional</small></label><input type="number" id="Kp_n" step="0.5" value="50" aria-label="Kp valor"><input type="range" id="Kp" min="0" max="200" step="0.5" value="50"></div>
+          <div class="row"><label for="Kd">Kd <small>derivativa</small></label><input type="number" id="Kd_n" step="0.5" value="25" aria-label="Kd valor"><input type="range" id="Kd" min="0" max="100" step="0.5" value="25"></div>
+          <div class="row"><label for="Ki">Ki <small>integral</small></label><input type="number" id="Ki_n" step="0.5" value="0" aria-label="Ki valor"><input type="range" id="Ki" min="0" max="200" step="0.5" value="0"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Referencia y planta</legend>
+          <div class="field">
+            <label for="refType">Tipo de referencia</label>
+            <select id="refType"><option value="step">Escalón en z_d</option><option value="sine">Senoidal: z_d + A·sen(ω·t)</option></select>
+          </div>
+          <div class="row"><label for="zd_n">z_d (m)</label><input type="number" id="zd_n" step="0.5" value="10"></div>
+          <div class="row"><label for="z0_n">z(0) (m)</label><input type="number" id="z0_n" step="0.5" value="0"></div>
+          <div class="row" data-sine hidden><label for="amp_n">Amplitud A (m)</label><input type="number" id="amp_n" step="0.1" value="1"></div>
+          <div class="row" data-sine hidden><label for="freq_n">Frecuencia ω (rad/s)</label><input type="number" id="freq_n" step="0.1" value="1"></div>
+          <div class="row"><label for="m_n">Masa m (kg)</label><input type="number" id="m_n" step="0.1" min="0.05" value="1"></div>
+          <p class="hint">g = 9.81 m/s². Eje z positivo hacia abajo (NED), como en el código de la Fig. 3.3.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Empuje</legend>
+          <label class="check"><input type="checkbox" id="limit"><span>Limitar T_T a [0, k·m·g]</span></label>
+          <div class="row"><label for="Tmaxf_n">k (múltiplo del peso)</label><input type="number" id="Tmaxf_n" step="0.1" min="1" value="2"></div>
+          <p class="hint">Apagado reproduce la tesina. Con Kp = 50 y un escalón de 10 m la ley pide empuje negativo, algo que unos motores reales no dan.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Solver (paso fijo)</legend>
+          <div class="field"><label for="method">Método</label><select id="method"><option value="rk4">Runge-Kutta 4</option><option value="euler">Euler explícito</option></select></div>
+          <div class="field"><label for="dt">Paso dt (s)</label>
+            <select id="dt"><option>0.001</option><option>0.005</option><option selected>0.01</option><option>0.02</option><option>0.05</option><option>0.1</option></select></div>
+          <div class="row"><label for="T_n">Duración (s)</label><input type="number" id="T_n" step="5" min="1" max="200" value="20"></div>
+          <label class="check"><input type="checkbox" id="delay"><span>Retardo de un paso en la realimentación (bloque Memory)</span></label>
+          <p class="hint">El bloque Memory que agregaste para el bucle algebraico mete justo este retardo. Con ganancias grandes y paso grande puede desestabilizar la simulación.</p>
+        </fieldset>
+      </div>
+
+      <div class="stack">
+        <div class="panel">
+          <div class="chart-head"><h2>Altura z(t)</h2><div class="legend" id="lg-z"></div></div>
+          <div class="chartbox"><canvas id="c-z" aria-label="Gráfica de altura contra tiempo" role="img"></canvas><div class="tip" id="tip-z"></div></div>
+        </div>
+        <div class="panel">
+          <div class="chart-head"><h2>Empuje T_T(t)</h2><div class="legend" id="lg-T"></div></div>
+          <div class="chartbox"><canvas id="c-T" aria-label="Gráfica de empuje contra tiempo" role="img"></canvas><div class="tip" id="tip-T"></div></div>
+        </div>
+        <div class="panel">
+          <h2 class="sec">Respuesta</h2>
+          <dl class="metrics" id="alt-metrics"></dl>
+        </div>
+        <div class="panel">
+          <h2 class="sec">Verificación de las ecuaciones</h2>
+          <ul class="checks" id="alt-checks"></ul>
+          <details>
+            <summary>Ecuaciones implementadas</summary>
+            <pre class="eqs">3.1  m·X'' = m·g·e3 − T_T·R(Φ)·e3
+3.2  J·Ω' = −Ω^·J·Ω + M_b          (no se simula: Φ = 0, M_b = 0)
+3.3  z~ = z_d − z      3.4  z~' = z_d' − z'      3.5  z~'' = z_d'' − z''
+3.6  T_T = m·(g − z_d'' − Kp·z~ − Kd·z~' [− Ki·∫z~])
+3.7  z~'' + Kd·z~' + Kp·z~ = 0      (lazo cerrado, Ki = 0)</pre>
+          </details>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== X-Y ===================== -->
+  <section id="view-xy" role="tabpanel" aria-labelledby="tab-xy" hidden>
+    <div class="layout">
+      <div class="panel" id="xy-controls">
+        <fieldset>
+          <legend>Referencia</legend>
+          <div class="row"><label for="xd_n">x_d (m)</label><input type="number" id="xd_n" step="0.5" value="5"></div>
+          <div class="row"><label for="yd_n">y_d (m)</label><input type="number" id="yd_n" step="0.5" value="3"></div>
+          <div class="row"><label for="zdx_n">z_d (m)</label><input type="number" id="zdx_n" step="0.5" value="0"></div>
+          <div class="row"><label for="mx_n">Masa m (kg)</label><input type="number" id="mx_n" step="0.1" min="0.05" value="1"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Lazo de posición (ec. 3.8 y 3.9)</legend>
+          <div class="row"><label for="Kpx">Kp x, y</label><input type="number" id="Kpx_n" step="0.1" value="1"><input type="range" id="Kpx" min="0" max="10" step="0.1" value="1"></div>
+          <div class="row"><label for="Kdx">Kd x, y</label><input type="number" id="Kdx_n" step="0.1" value="2"><input type="range" id="Kdx" min="0" max="10" step="0.1" value="2"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Lazo de altura (ec. 3.6)</legend>
+          <div class="row"><label for="Kpz">Kp z</label><input type="number" id="Kpz_n" step="0.5" value="20"><input type="range" id="Kpz" min="0" max="100" step="0.5" value="20"></div>
+          <div class="row"><label for="Kdz">Kd z</label><input type="number" id="Kdz_n" step="0.5" value="9"><input type="range" id="Kdz" min="0" max="50" step="0.5" value="9"></div>
+          <label class="check"><input type="checkbox" id="tilt"><span>Compensar inclinación (dividir T_T entre cosθ·cosφ)</span></label>
+          <p class="hint">Apagado sigue la ec. 3.6, que supone R = I. Al inclinarse el dron pierde empuje vertical.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Lazo interno de actitud (modelo)</legend>
+          <div class="row"><label for="tau_n">Constante τ (s)</label><input type="number" id="tau_n" step="0.01" min="0.01" value="0.05"></div>
+          <div class="row"><label for="thmax_n">Ángulo máx (°)</label><input type="number" id="thmax_n" step="5" min="5" max="85" value="30"></div>
+          <p class="hint">Esta tesina no implementó la actitud. Aquí θ y φ siguen a θ_d y φ_d con un retardo de primer orden, solo para probar las ecuaciones.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Empuje y solver</legend>
+          <label class="check"><input type="checkbox" id="limitx" checked><span>Limitar T_T a [0, 2·m·g]</span></label>
+          <div class="field"><label for="dtx">Paso dt (s)</label>
+            <select id="dtx"><option>0.001</option><option selected>0.005</option><option>0.01</option><option>0.02</option></select></div>
+          <div class="row"><label for="Tx_n">Duración (s)</label><input type="number" id="Tx_n" step="5" min="1" max="100" value="25"></div>
+        </fieldset>
+      </div>
+
+      <div class="stack">
+        <div class="panel">
+          <div class="chart-head"><h2>Posición x(t), y(t)</h2><div class="legend" id="lg-xy1"></div></div>
+          <div class="chartbox"><canvas id="c-xy1" aria-label="Posición x y y contra tiempo" role="img"></canvas><div class="tip" id="tip-xy1"></div></div>
+        </div>
+        <div class="panel">
+          <div class="chart-head"><h2>Ángulos θ(t), φ(t) contra θ_d, φ_d</h2><div class="legend" id="lg-xy2"></div></div>
+          <div class="chartbox"><canvas id="c-xy2" aria-label="Ángulos contra tiempo" role="img"></canvas><div class="tip" id="tip-xy2"></div></div>
+        </div>
+        <div class="panel">
+          <div class="chart-head"><h2>Trayectoria vista desde arriba</h2><div class="legend" id="lg-xy3"></div></div>
+          <div class="chartbox"><canvas id="c-xy3" class="tall" aria-label="Trayectoria en el plano x y" role="img"></canvas></div>
+        </div>
+        <div class="panel">
+          <h2 class="sec">Respuesta</h2>
+          <dl class="metrics" id="xy-metrics"></dl>
+        </div>
+        <div class="panel">
+          <h2 class="sec">Prueba puntual de las ecuaciones 3.8 y 3.9</h2>
+          <p class="note" style="margin-top:0;margin-bottom:10px">Se calculan θ_d y φ_d con las ecuaciones, se meten en la matriz de rotación completa del código (Fig. 3.3, con ψ = 0) y se compara la aceleración que resulta contra la que se quería.</p>
+          <div class="inline-inputs">
+            <div><label for="vx_n">x~ (m)</label><input type="number" id="vx_n" step="0.5" value="2"></div>
+            <div><label for="vxd_n">x~' (m/s)</label><input type="number" id="vxd_n" step="0.5" value="0"></div>
+            <div><label for="vy_n">y~ (m)</label><input type="number" id="vy_n" step="0.5" value="1"></div>
+            <div><label for="vyd_n">y~' (m/s)</label><input type="number" id="vyd_n" step="0.5" value="0"></div>
+            <div><label for="vT_n">T_T / (m·g)</label><input type="number" id="vT_n" step="0.05" min="0.1" value="1"></div>
+          </div>
+          <div class="tablewrap"><table id="eq-table"></table></div>
+          <p class="note" id="eq-note"></p>
+        </div>
+        <div class="panel">
+          <h2 class="sec">Verificaciones de la simulación</h2>
+          <ul class="checks" id="xy-checks"></ul>
+          <details>
+            <summary>Ecuaciones implementadas</summary>
+            <pre class="eqs">3.1  m·X'' = m·g·e3 − T_T·R(Φ)·e3,  con ψ = 0:
+     x'' = −(T_T/m)·senθ·cosφ
+     y'' =  (T_T/m)·senφ
+     z'' =  g − (T_T/m)·cosθ·cosφ
+3.8  θ_d = m·(−x_d'' − Kpx·x~ − Kdx·x~')/T_T
+3.9  φ_d = −m·(−y_d'' − Kpy·y~ − Kdy·y~')/T_T
+3.6  T_T = m·(g − Kpz·z~ − Kdz·z~')    (z_d'' = 0)</pre>
+          </details>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+// ============================================================
+// Núcleo numérico (funciones puras, sin DOM)
+// ============================================================
+//<sim>
+const G = 9.81;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+// ---------- aritmética compleja mínima ----------
+const cm = (a, b) => [a[0]*b[0] - a[1]*b[1], a[0]*b[1] + a[1]*b[0]];
+const cs = (a, b) => [a[0]-b[0], a[1]-b[1]];
+const cdv = (a, b) => { const d = b[0]*b[0] + b[1]*b[1]; return [(a[0]*b[0] + a[1]*b[1])/d, (a[1]*b[0] - a[0]*b[1])/d]; };
+function polyRoots(c) { // c = [1, a1, ..., an], polinomio mónico
+  const n = c.length - 1; if (n < 1) return [];
+  const R = 1 + Math.max(...c.slice(1).map(Math.abs));
+  let r = []; for (let i = 0; i < n; i++) { const ang = 2*Math.PI*i/n + 0.35; r.push([0.5*R*Math.cos(ang), 0.5*R*Math.sin(ang)]); }
+  const ev = z => { let p = [1, 0]; for (let k = 1; k <= n; k++) { p = cm(p, z); p[0] += c[k]; } return p; };
+  for (let it = 0; it < 400; it++) {
+    let moved = 0;
+    for (let i = 0; i < n; i++) {
+      let den = [1, 0]; for (let j = 0; j < n; j++) if (j !== i) den = cm(den, cs(r[i], r[j]));
+      if (den[0] === 0 && den[1] === 0) den = [1e-12, 0];
+      const dz = cdv(ev(r[i]), den); r[i] = cs(r[i], dz); moved = Math.max(moved, Math.abs(dz[0]) + Math.abs(dz[1]));
+    }
+    if (moved < 1e-12) break;
+  }
+  return r;
+}
+
+// ---------- referencia de altura ----------
+function refz(P, t) {
+  if (P.refType === 'step') return [P.zd, 0, 0];
+  const w = P.freq, A = P.amp;
+  return [P.zd + A*Math.sin(w*t), A*w*Math.cos(w*t), -A*w*w*Math.sin(w*t)];
+}
+// ---------- ley de control de altura (ec. 3.6 o versión Simulink) ----------
+function ctrlAlt(P, t, s) { // s = [z, v, I] medidos
+  const [r, rd, rdd] = refz(P, t);
+  const e = r - s[0];
+  let u;
+  if (P.mode === 'theory') u = P.m * (G - rdd - P.Kp*e - P.Kd*(rd - s[1]) - P.Ki*s[2]);
+  else u = P.m * (-P.Kp*e - P.Kd*(-s[1]) - P.Ki*s[2]);
+  if (P.limit) u = clamp(u, 0, P.Tmaxf * P.m * G);
+  return u;
+}
+function simAlt(P) {
+  const N = Math.round(P.T / P.dt), h = P.dt;
+  const t = new Float64Array(N+1), z = new Float64Array(N+1), v = new Float64Array(N+1), Tt = new Float64Array(N+1);
+  let y = [P.z0, 0, 0], meas = y.slice(), diverged = false, lastIdx = N;
+  const f = (tt, s, u) => [s[1], G - u/P.m, refz(P, tt)[0] - s[0]];
+  for (let k = 0; k <= N; k++) {
+    const tk = k*h;
+    t[k] = tk; z[k] = y[0]; v[k] = y[1];
+    const u0 = ctrlAlt(P, tk, P.delay ? meas : y);
+    Tt[k] = u0;
+    if (!isFinite(y[0]) || Math.abs(y[0]) > 1e9) { diverged = true; lastIdx = k; for (let j = k; j <= N; j++) { t[j] = j*h; z[j] = NaN; v[j] = NaN; Tt[j] = NaN; } break; }
+    if (k === N) break;
+    const before = y.slice();
+    if (P.method === 'euler') {
+      const d = f(tk, y, u0);
+      y = [y[0] + h*d[0], y[1] + h*d[1], y[2] + h*d[2]];
+    } else {
+      const U = (tt, s) => P.delay ? u0 : ctrlAlt(P, tt, s);
+      const k1 = f(tk, y, U(tk, y));
+      const s2 = y.map((q, i) => q + 0.5*h*k1[i]); const k2 = f(tk + h/2, s2, U(tk + h/2, s2));
+      const s3 = y.map((q, i) => q + 0.5*h*k2[i]); const k3 = f(tk + h/2, s3, U(tk + h/2, s3));
+      const s4 = y.map((q, i) => q + h*k3[i]);     const k4 = f(tk + h, s4, U(tk + h, s4));
+      y = y.map((q, i) => q + h/6*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i]));
+    }
+    meas = before;
+  }
+  return { t, z, v, T: Tt, N, diverged, lastIdx };
+}
+// Solución analítica de la ec. 3.7 (Ki = 0, escalón, z(0)=z0, v(0)=0)
+function analyticAlt(P, t) {
+  const Kp = P.Kp, Kd = P.Kd;
+  const c = (P.mode === 'simple') ? -G/Kp : 0;       // e_p constante de la versión Simulink
+  const e0 = (P.zd - P.z0) - c;                        // ε(0)
+  const disc = Kd*Kd - 4*Kp, a = -Kd/2;
+  let eps;
+  if (Math.abs(disc) < 1e-9) eps = e0 * Math.exp(a*t) * (1 - a*t);
+  else if (disc > 0) { const s = Math.sqrt(disc)/2, r1 = a + s, r2 = a - s; eps = e0 * (r2*Math.exp(r1*t) - r1*Math.exp(r2*t)) / (r2 - r1); }
+  else { const b = Math.sqrt(-disc)/2; eps = e0 * Math.exp(a*t) * (Math.cos(b*t) - (a/b)*Math.sin(b*t)); }
+  return P.zd - (c + eps);
+}
+function metricsStep(P, S) {
+  const n = S.N, step = P.zd - P.z0;
+  const tail = Math.max(2, Math.floor(n*0.05));
+  let zf = 0, zp = 0;
+  for (let i = n - tail; i <= n; i++) zf += S.z[i];
+  zf /= (tail + 1);
+  for (let i = n - 2*tail; i < n - tail; i++) zp += S.z[i];
+  zp /= tail;
+  const settled = Math.abs(zf - zp) < 0.002 * Math.abs(step || 1);
+  let zmax = -Infinity; for (let i = 0; i <= n; i++) if (S.z[i] > zmax) zmax = S.z[i];
+  const ov = (step !== 0) ? Math.max(0, (zmax - P.zd) / Math.abs(step) * 100) * (step > 0 ? 1 : 1) : 0;
+  const lo = P.z0 + 0.1*step, hi = P.z0 + 0.9*step;
+  let tlo = null, thi = null;
+  for (let i = 0; i <= n; i++) { const q = S.z[i]; if (tlo === null && (step > 0 ? q >= lo : q <= lo)) tlo = S.t[i]; if (thi === null && (step > 0 ? q >= hi : q <= hi)) { thi = S.t[i]; break; } }
+  const band = 0.02 * Math.abs(step); let ts = null;
+  for (let i = n; i >= 0; i--) if (Math.abs(S.z[i] - zf) > band) { ts = (i === n) ? null : S.t[i+1]; break; }
+  if (ts === null && Math.abs(S.z[0] - zf) <= band) ts = 0;
+  return { zf, ess: P.zd - zf, settled, overshoot: ov, tr: (tlo !== null && thi !== null) ? thi - tlo : null, ts };
+}
+
+// ---------- x-y con cascada ----------
+const Rfull = (phi, th, psi) => { // matriz de rotación del código de la Fig. 3.3
+  const cphi = Math.cos(phi), sphi = Math.sin(phi), cth = Math.cos(th), sth = Math.sin(th), cpsi = Math.cos(psi), spsi = Math.sin(psi);
+  return [[cpsi*cth, cpsi*sth*sphi - spsi*cphi, cpsi*sth*cphi + spsi*sphi],
+          [spsi*cth, spsi*sth*sphi + cpsi*cphi, spsi*sth*cphi - cpsi*sphi],
+          [-sth,     cth*sphi,                  cth*cphi]];
+};
+function anglesDesired(Q, ex, edx, ey, edy, T) { // ec. 3.8 y 3.9 con x_d'' = y_d'' = 0
+  if (Math.abs(T) < 1e-3) return [0, 0];
+  const thd = Q.m * (-Q.Kpx*ex - Q.Kdx*edx) / T;
+  const phd = -Q.m * (-Q.Kpx*ey - Q.Kdx*edy) / T;
+  return [thd, phd];
+}
+function simXY(Q) {
+  const N = Math.round(Q.T / Q.dt), h = Q.dt, lim = Q.thmax * Math.PI/180;
+  const out = { t: new Float64Array(N+1), x: new Float64Array(N+1), y: new Float64Array(N+1), z: new Float64Array(N+1),
+                th: new Float64Array(N+1), ph: new Float64Array(N+1), thd: new Float64Array(N+1), phd: new Float64Array(N+1), T: new Float64Array(N+1), N };
+  let s = [0, 0, Q.z0, 0, 0, 0, 0, 0]; // x,y,z,vx,vy,vz,th,ph
+  let satAng = 0, satT = 0, diverged = false;
+  const ctrl = (st) => {
+    const ez = Q.zd - st[2], edz = -st[5];
+    let T = Q.m * (G - Q.Kpz*ez - Q.Kdz*edz);
+    if (Q.tilt) { const c = Math.cos(st[6]) * Math.cos(st[7]); if (Math.abs(c) > 0.2) T /= c; }
+    let sat = false;
+    if (Q.limit) { const T2 = clamp(T, 0, 2*Q.m*G); if (T2 !== T) sat = true; T = T2; }
+    const [a, b] = anglesDesired(Q, Q.xd - st[0], -st[3], Q.yd - st[1], -st[4], T);
+    const thd = clamp(a, -lim, lim), phd = clamp(b, -lim, lim);
+    return { T, thd, phd, satA: (thd !== a || phd !== b), satT: sat };
+  };
+  const f = (st) => {
+    const c = ctrl(st);
+    const ct = Math.cos(st[6]), stt = Math.sin(st[6]), cp = Math.cos(st[7]), sp = Math.sin(st[7]);
+    return [st[3], st[4], st[5], -(c.T/Q.m)*stt*cp, (c.T/Q.m)*sp, G - (c.T/Q.m)*ct*cp, (c.thd - st[6])/Q.tau, (c.phd - st[7])/Q.tau];
+  };
+  for (let k = 0; k <= N; k++) {
+    const c = ctrl(s);
+    out.t[k] = k*h; out.x[k] = s[0]; out.y[k] = s[1]; out.z[k] = s[2]; out.th[k] = s[6]; out.ph[k] = s[7];
+    out.thd[k] = c.thd; out.phd[k] = c.phd; out.T[k] = c.T;
+    if (c.satA) satAng++; if (c.satT) satT++;
+    if (!isFinite(s[0]) || Math.abs(s[0]) > 1e6) { diverged = true; break; }
+    if (k === N) break;
+    const k1 = f(s), s2 = s.map((q, i) => q + 0.5*h*k1[i]);
+    const k2 = f(s2), s3 = s.map((q, i) => q + 0.5*h*k2[i]);
+    const k3 = f(s3), s4 = s.map((q, i) => q + h*k3[i]);
+    const k4 = f(s4);
+    s = s.map((q, i) => q + h/6*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i]));
+  }
+  out.satAng = satAng; out.satT = satT; out.diverged = diverged;
+  return out;
+}
+//</sim>
+
+// ============================================================
+// Interfaz
+// ============================================================
+const $ = id => document.getElementById(id);
+const num = id => parseFloat($(id).value);
+const fmt = (v, d = 3) => {
+  if (v === null || v === undefined || Number.isNaN(v)) return '—';
+  if (!isFinite(v)) return v > 0 ? '∞' : '−∞';
+  const a = Math.abs(v);
+  if (a !== 0 && (a >= 1e5 || a < 1e-3)) return v.toExponential(2).replace('e+', 'e');
+  return String(Number(v.toPrecision(d + 1)));
+};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function niceTicks(a, b, n = 5) {
+  const span = (b - a) || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+  const step = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag;
+  const out = []; for (let v = Math.ceil(a/step - 1e-9) * step; v <= b + step*1e-6; v += step) out.push(Number(v.toPrecision(12)));
+  return out;
+}
+
+// ---------- gráfica en canvas ----------
+function drawChart(cv, cfg) {
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return;
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  const fg = css('--fg'), muted = css('--muted'), line = css('--line');
+  const m = { l: 58, r: 12, t: 10, b: 40 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const s of cfg.series) for (let i = 0; i < s.x.length; i++) {
+    const X = s.x[i], Y = s.y[i];
+    if (isFinite(X) && isFinite(Y) && Math.abs(Y) < 1e12) { if (X < x0) x0 = X; if (X > x1) x1 = X; if (Y < y0) y0 = Y; if (Y > y1) y1 = Y; }
+  }
+  for (const h of (cfg.hl || [])) { if (h.y < y0) y0 = h.y; if (h.y > y1) y1 = h.y; }
+  if (!isFinite(x0)) { x0 = 0; x1 = 1; y0 = 0; y1 = 1; }
+  if (y1 - y0 < 1e-9) { y0 -= 1; y1 += 1; }
+  const padY = (y1 - y0) * 0.06; y0 -= padY; y1 += padY;
+  if (cfg.equal) { // misma escala en ambos ejes
+    const sx = (x1 - x0) / pw, sy = (y1 - y0) / ph, s = Math.max(sx, sy), cx = (x0 + x1)/2, cy = (y0 + y1)/2;
+    x0 = cx - s*pw/2; x1 = cx + s*pw/2; y0 = cy - s*ph/2; y1 = cy + s*ph/2;
+  }
+  const X = v => m.l + (v - x0) / (x1 - x0) * pw, Y = v => m.t + ph - (v - y0) / (y1 - y0) * ph;
+  c.font = '11px ' + css('--font-mono'); c.textBaseline = 'middle';
+  // rejilla y ticks
+  c.lineWidth = 1;
+  for (const v of niceTicks(y0, y1, 5)) { const yy = Y(v); c.strokeStyle = line; c.beginPath(); c.moveTo(m.l, yy); c.lineTo(m.l + pw, yy); c.stroke(); c.fillStyle = muted; c.textAlign = 'right'; c.fillText(fmt(v, 3), m.l - 6, yy); }
+  c.textBaseline = 'top';
+  for (const v of niceTicks(x0, x1, 6)) { const xx = X(v); c.strokeStyle = line; c.beginPath(); c.moveTo(xx, m.t); c.lineTo(xx, m.t + ph); c.stroke(); c.fillStyle = muted; c.textAlign = 'center'; c.fillText(fmt(v, 3), xx, m.t + ph + 5); }
+  c.strokeStyle = muted; c.beginPath(); c.moveTo(m.l, m.t); c.lineTo(m.l, m.t + ph); c.lineTo(m.l + pw, m.t + ph); c.stroke();
+  // etiquetas de ejes
+  c.fillStyle = fg; c.font = '12px ' + css('--font-body');
+  c.textAlign = 'center'; c.textBaseline = 'bottom'; c.fillText(cfg.xlabel, m.l + pw/2, H - 2);
+  c.save(); c.translate(13, m.t + ph/2); c.rotate(-Math.PI/2); c.textBaseline = 'top'; c.fillText(cfg.ylabel, 0, 0); c.restore();
+  // líneas horizontales de referencia
+  c.save(); c.beginPath(); c.rect(m.l, m.t, pw, ph); c.clip();
+  for (const h of (cfg.hl || [])) { c.strokeStyle = css(h.color); c.lineWidth = 1.2; c.setLineDash([5, 4]); c.beginPath(); c.moveTo(m.l, Y(h.y)); c.lineTo(m.l + pw, Y(h.y)); c.stroke(); }
+  c.setLineDash([]);
+  for (const s of cfg.series) {
+    c.strokeStyle = css(s.color); c.lineWidth = s.w || 2; c.setLineDash(s.dash ? [6, 4] : []); c.lineJoin = 'round';
+    const n = s.x.length, stride = Math.max(1, Math.floor(n / 2500));
+    c.beginPath(); let pen = false;
+    for (let i = 0; i < n; i += stride) {
+      const xv = s.x[i], yv = s.y[i];
+      if (!isFinite(xv) || !isFinite(yv) || Math.abs(yv) > 1e12) { pen = false; continue; }
+      if (!pen) { c.moveTo(X(xv), Y(yv)); pen = true; } else c.lineTo(X(xv), Y(yv));
+    }
+    c.stroke();
+    if (s.marks) for (const p of s.marks) { c.fillStyle = css(p.color); c.beginPath(); c.arc(X(p.x), Y(p.y), 5, 0, 7); c.fill(); }
+  }
+  c.restore(); c.setLineDash([]);
+  cv._chart = { cfg, m, pw, ph, x0, x1, X, Y };
+}
+function bindHover(cv, tipId) {
+  const tip = $(tipId);
+  const move = e => {
+    const ch = cv._chart; if (!ch || ch.cfg.equal) return;
+    const r = cv.getBoundingClientRect(), px = e.clientX - r.left;
+    if (px < ch.m.l || px > ch.m.l + ch.pw) { tip.style.display = 'none'; return; }
+    const tv = ch.x0 + (px - ch.m.l) / ch.pw * (ch.x1 - ch.x0);
+    const s0 = ch.cfg.series[0], n = s0.x.length, dt = n > 1 ? (s0.x[n-1] - s0.x[0]) / (n - 1) : 1;
+    const idx = clamp(Math.round((tv - s0.x[0]) / dt), 0, n - 1);
+    let txt = 't = ' + fmt(s0.x[idx], 3) + ' s';
+    for (const s of ch.cfg.series) if (s.name) txt += '\n' + s.name + ' = ' + fmt(s.y[idx], 4);
+    tip.textContent = txt; tip.style.display = 'block';
+    const bw = tip.offsetWidth; tip.style.left = clamp(px + 12, 0, r.width - bw) + 'px'; tip.style.top = '8px';
+  };
+  cv.addEventListener('pointermove', move);
+  cv.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+}
+function legend(id, items) {
+  $(id).innerHTML = items.map(s => '<span><i class="' + (s.dash ? 'dash' : '') + '" style="border-color:var(' + s.color + ')"></i>' + s.name + '</span>').join('');
+}
+
+// ---------- utilidades de verificación ----------
+function check(status, title, detail) { return { status, title, detail }; }
+function renderChecks(id, list) {
+  const lab = { ok: 'Cumple', warn: 'Revisar', bad: 'Falla', na: 'No aplica' };
+  $(id).innerHTML = list.map(c => '<li><span class="badge ' + c.status + '">' + lab[c.status] + '</span><div><div class="t">' + c.title + '</div><div class="d">' + c.detail + '</div></div></li>').join('');
+}
+function renderMetrics(id, items) {
+  $(id).innerHTML = items.map(([k, v]) => '<div><dt>' + k + '</dt><dd>' + v + '</dd></div>').join('');
+}
+const fmtPole = p => { const re = fmt(p[0], 3), im = Math.abs(p[1]) < 1e-6 ? '' : (' ± ' + fmt(Math.abs(p[1]), 3) + 'j'); return re + im; };
+
+// ============================================================
+// Pestaña Altura
+// ============================================================
+function getAltParams() {
+  const P = { m: num('m_n'), zd: num('zd_n'), z0: num('z0_n'), refType: $('refType').value, amp: num('amp_n'), freq: num('freq_n'),
+    Kp: num('Kp_n'), Kd: num('Kd_n'), Ki: num('Ki_n'), mode: $('mode').value, dt: parseFloat($('dt').value), method: $('method').value,
+    delay: $('delay').checked, T: clamp(num('T_n'), 1, 200), limit: $('limit').checked, Tmaxf: num('Tmaxf_n') };
+  return Object.values(P).some(v => typeof v === 'number' && !isFinite(v)) || P.m <= 0 || P.Tmaxf < 1 ? null : P;
+}
+function runAlt() {
+  const P = getAltParams(); if (!P) return;
+  document.querySelectorAll('[data-sine]').forEach(el => { el.hidden = P.refType !== 'sine'; });
+  const S = simAlt(P);
+  const isStep = P.refType === 'step';
+  // Referencia para graficar
+  const zref = new Float64Array(S.t.length); for (let i = 0; i < S.t.length; i++) zref[i] = refz(P, S.t[i])[0];
+  const series = [{ x: S.t, y: S.z, color: '--accent', w: 2.2, name: 'z' }, { x: S.t, y: zref, color: '--ref', dash: true, w: 1.5, name: 'z_d' }];
+  const leg = [{ name: 'z simulada', color: '--accent' }, { name: 'referencia z_d', color: '--ref', dash: true }];
+  const canAnalytic = isStep && P.Ki === 0 && P.Kp > 0 && P.z0 !== undefined && !P.limit;
+  if (canAnalytic) {
+    const za = new Float64Array(S.t.length); for (let i = 0; i < za.length; i++) za[i] = analyticAlt(P, S.t[i]);
+    series.push({ x: S.t, y: za, color: '--alt', w: 1.4, name: 'analítica', dash: true });
+    leg.push({ name: 'solución analítica (ec. 3.7)', color: '--alt', dash: true });
+  }
+  legend('lg-z', leg);
+  drawChart($('c-z'), { series, xlabel: 'Tiempo [s]', ylabel: 'Altura z [m]' });
+  const mg = P.m * G;
+  legend('lg-T', [{ name: 'T_T', color: '--s2' }, { name: 'peso m·g', color: '--ref', dash: true }]);
+  drawChart($('c-T'), { series: [{ x: S.t, y: S.T, color: '--s2', w: 2, name: 'T_T' }], hl: [{ y: mg, color: '--ref' }, { y: 0, color: '--bad' }], xlabel: 'Tiempo [s]', ylabel: 'Empuje T_T [N]' });
+
+  // polos
+  const coef = P.Ki > 0 ? [1, P.Kd, P.Kp, P.Ki] : [1, P.Kd, P.Kp];
+  const poles = P.Kp === 0 && P.Ki === 0 ? [[0, 0], [-P.Kd, 0]] : polyRoots(coef);
+  const stable = poles.every(p => p[0] < -1e-9);
+  const wn = Math.sqrt(Math.max(P.Kp, 0)), zeta = wn > 0 ? P.Kd / (2*wn) : NaN;
+  // métricas
+  let Tmin = Infinity, Tmax = -Infinity;
+  for (let i = 0; i <= S.N; i++) { if (isFinite(S.T[i])) { if (S.T[i] < Tmin) Tmin = S.T[i]; if (S.T[i] > Tmax) Tmax = S.T[i]; } }
+  const metrics = [];
+  let M = null;
+  if (S.diverged) metrics.push(['Estado', 'divergió en t = ' + fmt(S.lastIdx * P.dt, 3) + ' s']);
+  else if (isStep) {
+    M = metricsStep(P, S);
+    metrics.push(['Sobreimpulso', fmt(M.overshoot, 3) + ' %'], ['Tiempo de subida (10-90 %)', M.tr === null ? '—' : fmt(M.tr, 3) + ' s'],
+      ['Tiempo de asentamiento (2 %)', M.ts === null ? 'no se asienta' : fmt(M.ts, 3) + ' s'], ['Valor final', fmt(M.zf, 4) + ' m'], ['Error estacionario', fmt(M.ess, 3) + ' m']);
+  } else {
+    const half = Math.floor(S.N / 2); let ss = 0, zmx = -Infinity, zmn = Infinity, emx = 0;
+    for (let i = half; i <= S.N; i++) { const e = zref[i] - S.z[i]; ss += e*e; emx = Math.max(emx, Math.abs(e)); zmx = Math.max(zmx, S.z[i]); zmn = Math.min(zmn, S.z[i]); }
+    metrics.push(['Error RMS (2ª mitad)', fmt(Math.sqrt(ss / (S.N - half + 1)), 3) + ' m'], ['Error máximo (2ª mitad)', fmt(emx, 3) + ' m'], ['Amplitud de z', fmt((zmx - zmn)/2, 3) + ' m'], ['Amplitud de z_d', fmt(P.amp, 3) + ' m']);
+  }
+  metrics.push(['ωn = √Kp', wn > 0 ? fmt(wn, 3) + ' rad/s' : '—'], ['ζ = Kd / (2·√Kp)', isFinite(zeta) ? fmt(zeta, 3) : '—'],
+    ['Polos', poles.map(fmtPole).join(' ; ')], ['T_T mín / máx', fmt(Tmin, 3) + ' / ' + fmt(Tmax, 3) + ' N']);
+  if (isStep && P.Ki === 0 && isFinite(zeta) && zeta < 1 && zeta > 0) metrics.push(['Sobreimpulso teórico', fmt(Math.exp(-Math.PI*zeta/Math.sqrt(1 - zeta*zeta)) * 100, 3) + ' %']);
+  renderMetrics('alt-metrics', metrics);
+
+  // verificaciones
+  const ch = [];
+  ch.push(stable ? check('ok', 'Estabilidad del lazo cerrado', 'Todos los polos tienen parte real negativa: ' + poles.map(fmtPole).join(' ; ') + '.')
+                 : check('bad', 'Estabilidad del lazo cerrado', 'Hay polos con parte real positiva o cero (' + poles.map(fmtPole).join(' ; ') + '). Con Ki > 0 se requiere Kd·Kp > Ki.'));
+  if (S.diverged) {
+    ch.push(check(stable ? 'bad' : 'warn', 'Estabilidad numérica', stable
+      ? 'La teoría dice que el lazo es estable, pero la simulación divergió. Es inestabilidad numérica por el paso, el método o el retardo de un paso, no de la ley de control. Baja dt, usa RK4 o apaga el retardo.'
+      : 'La simulación divergió, consistente con polos inestables.'));
+  } else {
+    ch.push(check('ok', 'Estabilidad numérica', 'La simulación no divergió con dt = ' + P.dt + ' s, ' + (P.method === 'rk4' ? 'RK4' : 'Euler') + (P.delay ? ' y retardo de un paso.' : '.')));
+  }
+  if (canAnalytic && !S.diverged) {
+    let mx = 0; for (let i = 0; i <= S.N; i++) mx = Math.max(mx, Math.abs(S.z[i] - analyticAlt(P, S.t[i])));
+    const rel = mx / Math.abs(P.zd - P.z0 || 1) * 100;
+    ch.push(check(rel < 1 ? 'ok' : rel < 5 ? 'warn' : 'bad', 'Simulación contra solución analítica (ec. 3.7)',
+      'Diferencia máxima ' + fmt(mx, 3) + ' m (' + fmt(rel, 3) + ' % del escalón). ' + (rel < 1 ? 'La simulación reproduce la dinámica de lazo cerrado que predice la ecuación.' : 'El paso, el método o el retardo introducen un error apreciable.')));
+  } else {
+    ch.push(check('na', 'Simulación contra solución analítica (ec. 3.7)', 'Solo se calcula con escalón, Ki = 0, Kp > 0 y sin límite de empuje.'));
+  }
+  if (isStep && !S.diverged && stable && !P.limit) {
+    const expected = (P.mode === 'simple' && P.Ki === 0) ? -G / P.Kp : 0;
+    const err = M.ess - expected, tol = Math.max(0.01 * Math.abs(P.zd - P.z0), 0.02);
+    const what = P.mode === 'theory' ? 'Con la ley teórica (incluye m·g) el error estacionario debe ser 0.'
+      : (P.Ki === 0 ? 'Sin m·g y sin integral queda el offset −g/Kp = ' + fmt(-G/P.Kp, 3) + ' m (z termina en z_d + g/Kp).' : 'La integral debe eliminar el offset aunque no se compense m·g.');
+    if (!M.settled) ch.push(check('warn', 'Error de estado estacionario', 'La respuesta aún no se asienta al final de la simulación. Aumenta la duración. ' + what));
+    else ch.push(check(Math.abs(err) <= tol ? 'ok' : 'warn', 'Error de estado estacionario', what + ' Simulado: ' + fmt(M.ess, 3) + ' m.'));
+  } else {
+    ch.push(check('na', 'Error de estado estacionario', 'Se evalúa con escalón, lazo estable y sin límite de empuje.'));
+  }
+  if (!S.diverged) {
+    ch.push(Tmin < -1e-6 ? check('warn', 'Empuje físicamente posible', 'La ley pide T_T hasta ' + fmt(Tmin, 3) + ' N. Unos motores no dan empuje negativo. Activa el límite de empuje o reduce Kp para ver el efecto real.')
+                         : check('ok', 'Empuje físicamente posible', 'T_T se mantiene en [' + fmt(Tmin, 3) + ', ' + fmt(Tmax, 3) + '] N.'));
+  }
+  renderChecks('alt-checks', ch);
+}
+
+// ============================================================
+// Pestaña x-y
+// ============================================================
+function getXYParams() {
+  const Q = { xd: num('xd_n'), yd: num('yd_n'), zd: num('zdx_n'), z0: 0, m: num('mx_n'), Kpx: num('Kpx_n'), Kdx: num('Kdx_n'),
+    Kpz: num('Kpz_n'), Kdz: num('Kdz_n'), tilt: $('tilt').checked, tau: Math.max(0.005, num('tau_n')), thmax: clamp(num('thmax_n'), 5, 85),
+    limit: $('limitx').checked, dt: parseFloat($('dtx').value), T: clamp(num('Tx_n'), 1, 100) };
+  return Object.values(Q).some(v => typeof v === 'number' && !isFinite(v)) || Q.m <= 0 ? null : Q;
+}
+function runXY() {
+  const Q = getXYParams(); if (!Q) return;
+  const S = simXY(Q);
+  const xr = new Float64Array(S.t.length).fill(Q.xd), yr = new Float64Array(S.t.length).fill(Q.yd);
+  legend('lg-xy1', [{ name: 'x', color: '--accent' }, { name: 'y', color: '--s2' }, { name: 'x_d', color: '--accent', dash: true }, { name: 'y_d', color: '--s2', dash: true }]);
+  drawChart($('c-xy1'), { series: [{ x: S.t, y: S.x, color: '--accent', name: 'x' }, { x: S.t, y: S.y, color: '--s2', name: 'y' },
+    { x: S.t, y: xr, color: '--accent', dash: true, w: 1.2 }, { x: S.t, y: yr, color: '--s2', dash: true, w: 1.2 }], xlabel: 'Tiempo [s]', ylabel: 'Posición [m]' });
+  const deg = a => { const r = new Float64Array(a.length); for (let i = 0; i < a.length; i++) r[i] = a[i] * 180/Math.PI; return r; };
+  legend('lg-xy2', [{ name: 'θ', color: '--accent' }, { name: 'φ', color: '--s2' }, { name: 'θ_d', color: '--accent', dash: true }, { name: 'φ_d', color: '--s2', dash: true }]);
+  drawChart($('c-xy2'), { series: [{ x: S.t, y: deg(S.th), color: '--accent', name: 'θ' }, { x: S.t, y: deg(S.ph), color: '--s2', name: 'φ' },
+    { x: S.t, y: deg(S.thd), color: '--accent', dash: true, w: 1.2 }, { x: S.t, y: deg(S.phd), color: '--s2', dash: true, w: 1.2 }], xlabel: 'Tiempo [s]', ylabel: 'Ángulo [°]' });
+  legend('lg-xy3', [{ name: 'trayectoria', color: '--accent' }]);
+  drawChart($('c-xy3'), { series: [{ x: S.x, y: S.y, color: '--accent', w: 2.2, marks: [{ x: 0, y: 0, color: '--ref' }, { x: Q.xd, y: Q.yd, color: '--alt' }] }],
+    xlabel: 'x [m]  (gris: inicio, naranja: destino)', ylabel: 'y [m]', equal: true });
+  let thM = 0, phM = 0, Tmin = Infinity, Tmax = -Infinity, zdev = 0;
+  for (let i = 0; i <= S.N; i++) { thM = Math.max(thM, Math.abs(S.th[i])); phM = Math.max(phM, Math.abs(S.ph[i])); Tmin = Math.min(Tmin, S.T[i]); Tmax = Math.max(Tmax, S.T[i]); zdev = Math.max(zdev, Math.abs(S.z[i] - Q.zd)); }
+  const ex = Q.xd - S.x[S.N], ey = Q.yd - S.y[S.N], r2d = 180/Math.PI;
+  renderMetrics('xy-metrics', [['Error final x', fmt(ex, 3) + ' m'], ['Error final y', fmt(ey, 3) + ' m'], ['|θ| máximo', fmt(thM*r2d, 3) + ' °'], ['|φ| máximo', fmt(phM*r2d, 3) + ' °'],
+    ['Desviación máx. de altura', fmt(zdev, 3) + ' m'], ['T_T mín / máx', fmt(Tmin, 3) + ' / ' + fmt(Tmax, 3) + ' N']]);
+  const ch = [];
+  const conv = Math.hypot(ex, ey) < 0.02 * Math.max(1, Math.hypot(Q.xd, Q.yd));
+  ch.push(S.diverged ? check('bad', 'Convergencia a (x_d, y_d)', 'La simulación divergió. Reduce las ganancias o aumenta τ.')
+    : check(conv ? 'ok' : 'warn', 'Convergencia a (x_d, y_d)', conv ? 'El dron llega al destino con error final de ' + fmt(Math.hypot(ex, ey), 3) + ' m.' : 'Aún hay ' + fmt(Math.hypot(ex, ey), 3) + ' m de error al final. Aumenta la duración o ajusta Kp y Kd.'));
+  const small = Math.max(thM, phM) * r2d;
+  ch.push(check(small <= 20 ? 'ok' : 'warn', 'Validez de ángulos pequeños', 'Inclinación máxima ' + fmt(small, 3) + ' °. ' + (small <= 20 ? 'Las ecuaciones 3.8 y 3.9 usan sen θ ≈ θ y siguen siendo buenas aquí.' : 'Arriba de unos 20° la aproximación de las ecuaciones 3.8 y 3.9 pierde exactitud.')));
+  ch.push(S.satAng > 0 ? check('warn', 'Saturación del ángulo deseado', 'θ_d o φ_d tocaron el límite de ' + fmt(Q.thmax, 3) + ' ° en ' + S.satAng + ' pasos. El lazo no sigue la ley lineal en esos tramos.')
+                       : check('ok', 'Saturación del ángulo deseado', 'θ_d y φ_d nunca llegaron al límite de ' + fmt(Q.thmax, 3) + ' °.'));
+  ch.push(S.satT > 0 ? check('warn', 'Saturación del empuje', 'T_T tocó los límites en ' + S.satT + ' pasos.') : check('ok', 'Saturación del empuje', 'T_T se mantuvo dentro de [0, 2·m·g].'));
+  const zok = zdev < 0.5;
+  ch.push(check(zok ? 'ok' : 'warn', 'Altura durante el desplazamiento', 'La altura se desvió hasta ' + fmt(zdev, 3) + ' m de z_d. ' + (Q.tilt ? 'La compensación de inclinación está activa.' : 'Sin compensar inclinación, la ec. 3.6 pierde empuje vertical al inclinarse; prueba activar la casilla.')));
+  renderChecks('xy-checks', ch);
+  runEqTable(Q);
+}
+function runEqTable(Q) {
+  const ex = num('vx_n'), edx = num('vxd_n'), ey = num('vy_n'), edy = num('vyd_n'), r = num('vT_n');
+  if (![ex, edx, ey, edy, r].every(isFinite) || r <= 0) return;
+  const T = r * Q.m * G;
+  const [thd, phd] = anglesDesired(Q, ex, edx, ey, edy, T);
+  const axd = Q.Kpx*ex + Q.Kdx*edx, ayd = Q.Kpx*ey + Q.Kdx*edy; // aceleraciones deseadas
+  const R = Rfull(phd, thd, 0); // tercera columna R·e3
+  const axo = -(T/Q.m) * R[0][2], ayo = -(T/Q.m) * R[1][2];
+  const axs = -(T/Q.m) * thd, ays = (T/Q.m) * phd;
+  // en el código: R·e3 = [cψ sθ cφ + sψ sφ, sψ sθ cφ − cψ sφ, cθ cφ], por lo que ÿ = −(T/m)·R[1][2]
+  const rel = (a, b) => Math.abs(a) < 1e-9 ? (Math.abs(b) < 1e-9 ? '0 %' : '—') : fmt((b - a) / a * 100, 3) + ' %';
+  $('eq-table').innerHTML = '<thead><tr><th>Eje</th><th>Ángulo deseado</th><th>Aceleración deseada</th><th>Con R completa</th><th>Error</th><th>Con sen θ ≈ θ</th></tr></thead><tbody>' +
+    '<tr><td>x (θ_d, ec. 3.8)</td><td>' + fmt(thd*180/Math.PI, 4) + ' °</td><td>' + fmt(axd, 4) + ' m/s²</td><td>' + fmt(axo, 4) + ' m/s²</td><td>' + rel(axd, axo) + '</td><td>' + fmt(axs, 4) + ' m/s²</td></tr>' +
+    '<tr><td>y (φ_d, ec. 3.9)</td><td>' + fmt(phd*180/Math.PI, 4) + ' °</td><td>' + fmt(ayd, 4) + ' m/s²</td><td>' + fmt(ayo, 4) + ' m/s²</td><td>' + rel(ayd, ayo) + '</td><td>' + fmt(ays, 4) + ' m/s²</td></tr></tbody>';
+  const big = Math.max(Math.abs(thd), Math.abs(phd)) * 180/Math.PI;
+  $('eq-note').textContent = 'Signo: con x~ > 0 el dron debe acelerar hacia +x, y eso exige θ_d < 0 (nariz abajo en NED). Con ỹ > 0 exige φ_d > 0. ' +
+    (big > 20 ? 'Con ' + fmt(big, 3) + ' ° la aproximación de ángulos pequeños ya se nota en el error.' : 'Con ángulos chicos el error es de décimas de por ciento.');
+}
+
+// ============================================================
+// Cableado
+// ============================================================
+function bindPair(id, fn) {
+  const r = $(id), n = $(id + '_n');
+  r.addEventListener('input', () => { n.value = r.value; fn(); });
+  n.addEventListener('input', () => { if (n.value !== '') { r.value = n.value; fn(); } });
+}
+let raf = 0;
+const later = fn => () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fn); };
+const doAlt = later(runAlt), doXY = later(runXY);
+['Kp', 'Kd', 'Ki'].forEach(id => bindPair(id, doAlt));
+['Kpx', 'Kdx', 'Kpz', 'Kdz'].forEach(id => bindPair(id, doXY));
+['zd_n', 'z0_n', 'amp_n', 'freq_n', 'm_n', 'Tmaxf_n', 'T_n'].forEach(id => $(id).addEventListener('input', doAlt));
+['mode', 'refType', 'method', 'dt', 'limit', 'delay'].forEach(id => $(id).addEventListener('input', doAlt));
+['xd_n', 'yd_n', 'zdx_n', 'mx_n', 'tau_n', 'thmax_n', 'Tx_n', 'vx_n', 'vxd_n', 'vy_n', 'vyd_n', 'vT_n'].forEach(id => $(id).addEventListener('input', doXY));
+['tilt', 'limitx', 'dtx'].forEach(id => $(id).addEventListener('input', doXY));
+
+const PRESETS = { p: { Kp: 50, Kd: 0, Ki: 0 }, pd: { Kp: 50, Kd: 25, Ki: 0 }, pid: { Kp: 50, Kd: 25, Ki: 50 }, mask: { Kp: 2, Kd: 2, Ki: 0, zd: 4 } };
+document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
+  const p = PRESETS[b.dataset.preset];
+  for (const k of ['Kp', 'Kd', 'Ki']) { $(k).value = p[k]; $(k + '_n').value = p[k]; }
+  if (p.zd !== undefined) $('zd_n').value = p.zd;
+  runAlt();
+}));
+
+// pestañas
+function showTab(which) {
+  const alt = which === 'alt';
+  $('view-alt').hidden = !alt; $('view-xy').hidden = alt;
+  $('tab-alt').setAttribute('aria-selected', alt); $('tab-xy').setAttribute('aria-selected', !alt);
+  (alt ? runAlt : runXY)();
+}
+$('tab-alt').addEventListener('click', () => showTab('alt'));
+$('tab-xy').addEventListener('click', () => showTab('xy'));
+
+['c-z:tip-z', 'c-T:tip-T', 'c-xy1:tip-xy1', 'c-xy2:tip-xy2'].forEach(s => { const [c, t] = s.split(':'); bindHover($(c), t); });
+const redraw = () => { if (!$('view-alt').hidden) runAlt(); else runXY(); };
+new ResizeObserver(redraw).observe(document.querySelector('.app'));
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
+new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+runAlt();
+</script>
+
+</body>
+</html>
