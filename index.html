@@ -119,23 +119,19 @@ pre.eqs { font-family: var(--font-mono); font-size: 12px; background: var(--bg);
 [hidden] { display: none !important; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
-
 </head>
 <body>
+
 <div class="app">
   <header class="top">
     <div>
       <h1>Banco de sintonía PID</h1>
-      <p class="sub">Simula las ecuaciones 3.1 a 3.9 de la tesina: traslación del cuadricóptero con control de altura y la cascada de posición x-y. Mueve las ganancias y revisa si el resultado coincide con la teoría.</p>
-    </div>
-    <div class="tabs" role="tablist" aria-label="Modo">
-      <button role="tab" id="tab-alt" aria-selected="true" aria-controls="view-alt">Altura</button>
-      <button role="tab" id="tab-xy" aria-selected="false" aria-controls="view-xy">Posición x-y</button>
+      <p class="sub">Simula el control de altura del cuadricóptero de la tesina (ecuaciones 3.5 a 3.7) con acción PD o PID. Mueve las ganancias y revisa si el resultado coincide con la teoría.</p>
     </div>
   </header>
 
   <!-- ===================== ALTURA ===================== -->
-  <section id="view-alt" role="tabpanel" aria-labelledby="tab-alt">
+  <section id="view-alt">
     <div class="layout">
       <div class="panel" id="alt-controls">
         <div class="presets" aria-label="Ajustes rápidos">
@@ -233,94 +229,6 @@ pre.eqs { font-family: var(--font-mono); font-size: 12px; background: var(--bg);
       </div>
     </div>
   </section>
-
-  <!-- ===================== X-Y ===================== -->
-  <section id="view-xy" role="tabpanel" aria-labelledby="tab-xy" hidden>
-    <div class="layout">
-      <div class="panel" id="xy-controls">
-        <div class="presets"><button type="button" data-xypreset="slx">Ganancias de tu .slx</button></div>
-        <fieldset>
-          <legend>Referencia</legend>
-          <div class="row"><label for="xd_n">x_d (m)</label><input type="number" id="xd_n" step="0.5" value="5"></div>
-          <div class="row"><label for="yd_n">y_d (m)</label><input type="number" id="yd_n" step="0.5" value="3"></div>
-          <div class="row"><label for="zdx_n">z_d (m)</label><input type="number" id="zdx_n" step="0.5" value="0"></div>
-          <div class="row"><label for="mx_n">Masa m (kg)</label><input type="number" id="mx_n" step="0.1" min="0.05" value="1"></div>
-        </fieldset>
-        <fieldset>
-          <legend>Lazo de posición (ec. 3.8 y 3.9)</legend>
-          <div class="row"><label for="Kpx">Kp x, y</label><input type="number" id="Kpx_n" step="0.1" value="1"><input type="range" id="Kpx" min="0" max="10" step="0.1" value="1"></div>
-          <div class="row"><label for="Kdx">Kd x, y</label><input type="number" id="Kdx_n" step="0.1" value="2"><input type="range" id="Kdx" min="0" max="10" step="0.1" value="2"></div>
-        </fieldset>
-        <fieldset>
-          <legend>Lazo de altura (ec. 3.6)</legend>
-          <div class="row"><label for="Kpz">Kp z</label><input type="number" id="Kpz_n" step="0.5" value="20"><input type="range" id="Kpz" min="0" max="100" step="0.5" value="20"></div>
-          <div class="row"><label for="Kdz">Kd z</label><input type="number" id="Kdz_n" step="0.5" value="9"><input type="range" id="Kdz" min="0" max="50" step="0.5" value="9"></div>
-          <label class="check"><input type="checkbox" id="tilt"><span>Compensar inclinación (dividir T_T entre cosθ·cosφ)</span></label>
-          <p class="hint">Apagado sigue la ec. 3.6, que supone R = I. Al inclinarse el dron pierde empuje vertical.</p>
-        </fieldset>
-        <fieldset>
-          <legend>Lazo interno de actitud (modelo)</legend>
-          <div class="row"><label for="tau_n">Constante τ (s)</label><input type="number" id="tau_n" step="0.01" min="0.01" value="0.05"></div>
-          <div class="row"><label for="thmax_n">Ángulo máx (°)</label><input type="number" id="thmax_n" step="5" min="5" max="85" value="30"></div>
-          <p class="hint">Esta tesina no implementó la actitud. Aquí θ y φ siguen a θ_d y φ_d con un retardo de primer orden, solo para probar las ecuaciones.</p>
-        </fieldset>
-        <fieldset>
-          <legend>Empuje y solver</legend>
-          <label class="check"><input type="checkbox" id="limitx" checked><span>Limitar T_T a [0, 2·m·g]</span></label>
-          <div class="field"><label for="dtx">Paso dt (s)</label>
-            <select id="dtx"><option>0.001</option><option selected>0.005</option><option>0.01</option><option>0.02</option></select></div>
-          <div class="row"><label for="Tx_n">Duración (s)</label><input type="number" id="Tx_n" step="5" min="1" max="100" value="25"></div>
-        </fieldset>
-      </div>
-
-      <div class="stack">
-        <div class="panel">
-          <div class="chart-head"><h2>Posición x(t), y(t)</h2><div class="legend" id="lg-xy1"></div></div>
-          <div class="chartbox"><canvas id="c-xy1" aria-label="Posición x y y contra tiempo" role="img"></canvas><div class="tip" id="tip-xy1"></div></div>
-        </div>
-        <div class="panel">
-          <div class="chart-head"><h2>Ángulos θ(t), φ(t) contra θ_d, φ_d</h2><div class="legend" id="lg-xy2"></div></div>
-          <div class="chartbox"><canvas id="c-xy2" aria-label="Ángulos contra tiempo" role="img"></canvas><div class="tip" id="tip-xy2"></div></div>
-        </div>
-        <div class="panel">
-          <div class="chart-head"><h2>Trayectoria vista desde arriba</h2><div class="legend" id="lg-xy3"></div></div>
-          <div class="chartbox"><canvas id="c-xy3" class="tall" aria-label="Trayectoria en el plano x y" role="img"></canvas></div>
-        </div>
-        <div class="panel">
-          <h2 class="sec">Respuesta</h2>
-          <dl class="metrics" id="xy-metrics"></dl>
-        </div>
-        <div class="panel">
-          <h2 class="sec">Prueba puntual de las ecuaciones 3.8 y 3.9</h2>
-          <p class="note" style="margin-top:0;margin-bottom:10px">Se calculan θ_d y φ_d con las ecuaciones, se meten en la matriz de rotación completa del código (Fig. 3.3, con ψ = 0) y se compara la aceleración que resulta contra la que se quería.</p>
-          <div class="inline-inputs">
-            <div><label for="vx_n">x~ (m)</label><input type="number" id="vx_n" step="0.5" value="2"></div>
-            <div><label for="vxd_n">x~' (m/s)</label><input type="number" id="vxd_n" step="0.5" value="0"></div>
-            <div><label for="vy_n">y~ (m)</label><input type="number" id="vy_n" step="0.5" value="1"></div>
-            <div><label for="vyd_n">y~' (m/s)</label><input type="number" id="vyd_n" step="0.5" value="0"></div>
-            <div><label for="vT_n">T_T / (m·g)</label><input type="number" id="vT_n" step="0.05" min="0.1" value="1"></div>
-          </div>
-          <div class="tablewrap"><table id="eq-table"></table></div>
-          <p class="note" id="eq-note"></p>
-        </div>
-        <div class="panel">
-          <h2 class="sec">Verificaciones de la simulación</h2>
-          <ul class="checks" id="xy-checks"></ul>
-          <details>
-            <summary>Ecuaciones implementadas</summary>
-            <pre class="eqs">3.1  m·X'' = m·g·e3 − T_T·R(Φ)·e3,  con ψ = 0:
-     x'' = −(T_T/m)·senθ·cosφ
-     y'' =  (T_T/m)·senφ
-     z'' =  g − (T_T/m)·cosθ·cosφ
-3.8  θ_d = m·(−x_d'' − Kpx·x~ − Kdx·x~')/T_T
-3.9  φ_d = −m·(−y_d'' − Kpy·y~ − Kdy·y~')/T_T
-3.6  T_T = m·(g − Kpz·z~ − Kdz·z~')    (z_d'' = 0)</pre>
-          </details>
-        </div>
-      </div>
-    </div>
-  </section>
-</div>
 
 <script>
 // ============================================================
@@ -427,53 +335,6 @@ function metricsStep(P, S) {
   return { zf, ess: P.zd - zf, settled, overshoot: ov, tr: (tlo !== null && thi !== null) ? thi - tlo : null, ts };
 }
 
-// ---------- x-y con cascada ----------
-const Rfull = (phi, th, psi) => { // matriz de rotación del código de la Fig. 3.3
-  const cphi = Math.cos(phi), sphi = Math.sin(phi), cth = Math.cos(th), sth = Math.sin(th), cpsi = Math.cos(psi), spsi = Math.sin(psi);
-  return [[cpsi*cth, cpsi*sth*sphi - spsi*cphi, cpsi*sth*cphi + spsi*sphi],
-          [spsi*cth, spsi*sth*sphi + cpsi*cphi, spsi*sth*cphi - cpsi*sphi],
-          [-sth,     cth*sphi,                  cth*cphi]];
-};
-function anglesDesired(Q, ex, edx, ey, edy, T) { // ec. 3.8 y 3.9 con x_d'' = y_d'' = 0
-  if (Math.abs(T) < 1e-3) return [0, 0];
-  const thd = Q.m * (-Q.Kpx*ex - Q.Kdx*edx) / T;
-  const phd = -Q.m * (-Q.Kpx*ey - Q.Kdx*edy) / T;
-  return [thd, phd];
-}
-function simXY(Q) {
-  const N = Math.round(Q.T / Q.dt), h = Q.dt, lim = Q.thmax * Math.PI/180;
-  const out = { t: new Float64Array(N+1), x: new Float64Array(N+1), y: new Float64Array(N+1), z: new Float64Array(N+1),
-                th: new Float64Array(N+1), ph: new Float64Array(N+1), thd: new Float64Array(N+1), phd: new Float64Array(N+1), T: new Float64Array(N+1), N };
-  let s = [0, 0, Q.z0, 0, 0, 0, 0, 0]; // x,y,z,vx,vy,vz,th,ph
-  let satAng = 0, satT = 0, diverged = false;
-  const ctrl = (st) => {
-    const ez = Q.zd - st[2], edz = -st[5];
-    let T = Q.m * (G - Q.Kpz*ez - Q.Kdz*edz);
-    if (Q.tilt) { const c = Math.cos(st[6]) * Math.cos(st[7]); if (Math.abs(c) > 0.2) T /= c; }
-    let sat = false;
-    if (Q.limit) { const T2 = clamp(T, 0, 2*Q.m*G); if (T2 !== T) sat = true; T = T2; }
-    const [a, b] = anglesDesired(Q, Q.xd - st[0], -st[3], Q.yd - st[1], -st[4], T);
-    const thd = clamp(a, -lim, lim), phd = clamp(b, -lim, lim);
-    return { T, thd, phd, satA: (thd !== a || phd !== b), satT: sat };
-  };
-  const f = (st) => {
-    const c = ctrl(st);
-    const ct = Math.cos(st[6]), stt = Math.sin(st[6]), cp = Math.cos(st[7]), sp = Math.sin(st[7]);
-    return [st[3], st[4], st[5], -(c.T/Q.m)*stt*cp, (c.T/Q.m)*sp, G - (c.T/Q.m)*ct*cp, (c.thd - st[6])/Q.tau, (c.phd - st[7])/Q.tau];
-  };
-  for (let k = 0; k <= N; k++) {
-    const c = ctrl(s);
-    out.t[k] = k*h; out.x[k] = s[0]; out.y[k] = s[1]; out.z[k] = s[2]; out.th[k] = s[6]; out.ph[k] = s[7];
-    out.thd[k] = c.thd; out.phd[k] = c.phd; out.T[k] = c.T;
-    if (c.satA) satAng++; if (c.satT) satT++;
-    if (!isFinite(s[0]) || Math.abs(s[0]) > 1e6) { diverged = true; break; }
-    if (k === N) break;
-    const d = f(s);
-    s = s.map((q, i) => q + h*d[i]);
-  }
-  out.satAng = satAng; out.satT = satT; out.diverged = diverged;
-  return out;
-}
 //</sim>
 
 // ============================================================
@@ -732,67 +593,6 @@ function runAlt() {
 }
 
 // ============================================================
-// Pestaña x-y
-// ============================================================
-function getXYParams() {
-  const Q = { xd: num('xd_n'), yd: num('yd_n'), zd: num('zdx_n'), z0: 0, m: num('mx_n'), Kpx: num('Kpx_n'), Kdx: num('Kdx_n'),
-    Kpz: num('Kpz_n'), Kdz: num('Kdz_n'), tilt: $('tilt').checked, tau: Math.max(0.005, num('tau_n')), thmax: clamp(num('thmax_n'), 5, 85),
-    limit: $('limitx').checked, dt: parseFloat($('dtx').value), T: clamp(num('Tx_n'), 1, 100) };
-  return Object.values(Q).some(v => typeof v === 'number' && !isFinite(v)) || Q.m <= 0 ? null : Q;
-}
-function runXY() {
-  const Q = getXYParams(); if (!Q) return;
-  const S = simXY(Q);
-  const xr = new Float64Array(S.t.length).fill(Q.xd), yr = new Float64Array(S.t.length).fill(Q.yd);
-  legend('lg-xy1', [{ name: 'x', color: '--accent' }, { name: 'y', color: '--s2' }, { name: 'x_d', color: '--accent', dash: true }, { name: 'y_d', color: '--s2', dash: true }]);
-  drawChart($('c-xy1'), { series: [{ x: S.t, y: S.x, color: '--accent', name: 'x' }, { x: S.t, y: S.y, color: '--s2', name: 'y' },
-    { x: S.t, y: xr, color: '--accent', dash: true, w: 1.2 }, { x: S.t, y: yr, color: '--s2', dash: true, w: 1.2 }], xlabel: 'Tiempo [s]', ylabel: 'Posición [m]' });
-  const deg = a => { const r = new Float64Array(a.length); for (let i = 0; i < a.length; i++) r[i] = a[i] * 180/Math.PI; return r; };
-  legend('lg-xy2', [{ name: 'θ', color: '--accent' }, { name: 'φ', color: '--s2' }, { name: 'θ_d', color: '--accent', dash: true }, { name: 'φ_d', color: '--s2', dash: true }]);
-  drawChart($('c-xy2'), { series: [{ x: S.t, y: deg(S.th), color: '--accent', name: 'θ' }, { x: S.t, y: deg(S.ph), color: '--s2', name: 'φ' },
-    { x: S.t, y: deg(S.thd), color: '--accent', dash: true, w: 1.2 }, { x: S.t, y: deg(S.phd), color: '--s2', dash: true, w: 1.2 }], xlabel: 'Tiempo [s]', ylabel: 'Ángulo [°]' });
-  legend('lg-xy3', [{ name: 'trayectoria', color: '--accent' }]);
-  drawChart($('c-xy3'), { series: [{ x: S.x, y: S.y, color: '--accent', w: 2.2, marks: [{ x: 0, y: 0, color: '--ref' }, { x: Q.xd, y: Q.yd, color: '--alt' }] }],
-    xlabel: 'x [m]  (gris: inicio, naranja: destino)', ylabel: 'y [m]', equal: true });
-  let thM = 0, phM = 0, Tmin = Infinity, Tmax = -Infinity, zdev = 0;
-  for (let i = 0; i <= S.N; i++) { thM = Math.max(thM, Math.abs(S.th[i])); phM = Math.max(phM, Math.abs(S.ph[i])); Tmin = Math.min(Tmin, S.T[i]); Tmax = Math.max(Tmax, S.T[i]); zdev = Math.max(zdev, Math.abs(S.z[i] - Q.zd)); }
-  const ex = Q.xd - S.x[S.N], ey = Q.yd - S.y[S.N], r2d = 180/Math.PI;
-  renderMetrics('xy-metrics', [['Error final x', fmt(ex, 3) + ' m'], ['Error final y', fmt(ey, 3) + ' m'], ['|θ| máximo', fmt(thM*r2d, 3) + ' °'], ['|φ| máximo', fmt(phM*r2d, 3) + ' °'],
-    ['Desviación máx. de altura', fmt(zdev, 3) + ' m'], ['T_T mín / máx', fmt(Tmin, 3) + ' / ' + fmt(Tmax, 3) + ' N']]);
-  const ch = [];
-  const conv = Math.hypot(ex, ey) < 0.02 * Math.max(1, Math.hypot(Q.xd, Q.yd));
-  ch.push(S.diverged ? check('bad', 'Convergencia a (x_d, y_d)', 'La simulación divergió. Reduce las ganancias o aumenta τ.')
-    : check(conv ? 'ok' : 'warn', 'Convergencia a (x_d, y_d)', conv ? 'El dron llega al destino con error final de ' + fmt(Math.hypot(ex, ey), 3) + ' m.' : 'Aún hay ' + fmt(Math.hypot(ex, ey), 3) + ' m de error al final. Aumenta la duración o ajusta Kp y Kd.'));
-  const small = Math.max(thM, phM) * r2d;
-  ch.push(check(small <= 20 ? 'ok' : 'warn', 'Validez de ángulos pequeños', 'Inclinación máxima ' + fmt(small, 3) + ' °. ' + (small <= 20 ? 'Las ecuaciones 3.8 y 3.9 usan sen θ ≈ θ y siguen siendo buenas aquí.' : 'Arriba de unos 20° la aproximación de las ecuaciones 3.8 y 3.9 pierde exactitud.')));
-  ch.push(S.satAng > 0 ? check('warn', 'Saturación del ángulo deseado', 'θ_d o φ_d tocaron el límite de ' + fmt(Q.thmax, 3) + ' ° en ' + S.satAng + ' pasos. El lazo no sigue la ley lineal en esos tramos.')
-                       : check('ok', 'Saturación del ángulo deseado', 'θ_d y φ_d nunca llegaron al límite de ' + fmt(Q.thmax, 3) + ' °.'));
-  ch.push(S.satT > 0 ? check('warn', 'Saturación del empuje', 'T_T tocó los límites en ' + S.satT + ' pasos.') : check('ok', 'Saturación del empuje', 'T_T se mantuvo dentro de [0, 2·m·g].'));
-  const zok = zdev < 0.5;
-  ch.push(check(zok ? 'ok' : 'warn', 'Altura durante el desplazamiento', 'La altura se desvió hasta ' + fmt(zdev, 3) + ' m de z_d. ' + (Q.tilt ? 'La compensación de inclinación está activa.' : 'Sin compensar inclinación, la ec. 3.6 pierde empuje vertical al inclinarse; prueba activar la casilla.')));
-  renderChecks('xy-checks', ch);
-  runEqTable(Q);
-}
-function runEqTable(Q) {
-  const ex = num('vx_n'), edx = num('vxd_n'), ey = num('vy_n'), edy = num('vyd_n'), r = num('vT_n');
-  if (![ex, edx, ey, edy, r].every(isFinite) || r <= 0) return;
-  const T = r * Q.m * G;
-  const [thd, phd] = anglesDesired(Q, ex, edx, ey, edy, T);
-  const axd = Q.Kpx*ex + Q.Kdx*edx, ayd = Q.Kpx*ey + Q.Kdx*edy; // aceleraciones deseadas
-  const R = Rfull(phd, thd, 0); // tercera columna R·e3
-  const axo = -(T/Q.m) * R[0][2], ayo = -(T/Q.m) * R[1][2];
-  const axs = -(T/Q.m) * thd, ays = (T/Q.m) * phd;
-  // en el código: R·e3 = [cψ sθ cφ + sψ sφ, sψ sθ cφ − cψ sφ, cθ cφ], por lo que ÿ = −(T/m)·R[1][2]
-  const rel = (a, b) => Math.abs(a) < 1e-9 ? (Math.abs(b) < 1e-9 ? '0 %' : '—') : fmt((b - a) / a * 100, 3) + ' %';
-  $('eq-table').innerHTML = '<thead><tr><th>Eje</th><th>Ángulo deseado</th><th>Aceleración deseada</th><th>Con R completa</th><th>Error</th><th>Con sen θ ≈ θ</th></tr></thead><tbody>' +
-    '<tr><td>x (θ_d, ec. 3.8)</td><td>' + fmt(thd*180/Math.PI, 4) + ' °</td><td>' + fmt(axd, 4) + ' m/s²</td><td>' + fmt(axo, 4) + ' m/s²</td><td>' + rel(axd, axo) + '</td><td>' + fmt(axs, 4) + ' m/s²</td></tr>' +
-    '<tr><td>y (φ_d, ec. 3.9)</td><td>' + fmt(phd*180/Math.PI, 4) + ' °</td><td>' + fmt(ayd, 4) + ' m/s²</td><td>' + fmt(ayo, 4) + ' m/s²</td><td>' + rel(ayd, ayo) + '</td><td>' + fmt(ays, 4) + ' m/s²</td></tr></tbody>';
-  const big = Math.max(Math.abs(thd), Math.abs(phd)) * 180/Math.PI;
-  $('eq-note').textContent = 'Signo: con x~ > 0 el dron debe acelerar hacia +x, y eso exige θ_d < 0 (nariz abajo en NED). Con ỹ > 0 exige φ_d > 0. ' +
-    (big > 20 ? 'Con ' + fmt(big, 3) + ' ° la aproximación de ángulos pequeños ya se nota en el error.' : 'Con ángulos chicos el error es de décimas de por ciento.');
-}
-
-// ============================================================
 // Cableado
 // ============================================================
 function fitRange(r, v) { // el slider crece a la siguiente potencia de 10 si el valor se sale
@@ -807,13 +607,10 @@ function bindPair(id, fn) {
 }
 let raf = 0;
 const later = fn => () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fn); };
-const doAlt = later(runAlt), doXY = later(runXY);
+const doAlt = later(runAlt);
 ['Kp', 'Kd', 'Ki'].forEach(id => bindPair(id, doAlt));
-['Kpx', 'Kdx', 'Kpz', 'Kdz'].forEach(id => bindPair(id, doXY));
 ['zd_n', 'z0_n', 'amp_n', 'freq_n', 'm_n', 'Tmaxf_n', 'T_n'].forEach(id => $(id).addEventListener('input', doAlt));
 ['mode', 'refType', 'method', 'dt', 'limit', 'delay'].forEach(id => $(id).addEventListener('input', doAlt));
-['xd_n', 'yd_n', 'zdx_n', 'mx_n', 'tau_n', 'thmax_n', 'Tx_n', 'vx_n', 'vxd_n', 'vy_n', 'vyd_n', 'vT_n'].forEach(id => $(id).addEventListener('input', doXY));
-['tilt', 'limitx', 'dtx'].forEach(id => $(id).addEventListener('input', doXY));
 
 const PRESETS = {
   slx:  { Kp: 0.025, Kd: 0.25, Ki: 0, zd: 10, refType: 'step', mode: 'theory', T: 100 },
@@ -828,23 +625,8 @@ document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('clic
   if (p.amp !== undefined) { $('amp_n').value = p.amp; $('freq_n').value = p.freq; }
   runAlt();
 }));
-document.querySelectorAll('[data-xypreset]').forEach(b => b.addEventListener('click', () => {
-  for (const [k, v] of [['Kpx', 0.025], ['Kdx', 0.25], ['Kpz', 0.025], ['Kdz', 0.25]]) { $(k + '_n').value = v; $(k).value = v; }
-  $('Tx_n').value = 100; $('mx_n').value = 1; runXY();
-}));
-
-// pestañas
-function showTab(which) {
-  const alt = which === 'alt';
-  $('view-alt').hidden = !alt; $('view-xy').hidden = alt;
-  $('tab-alt').setAttribute('aria-selected', alt); $('tab-xy').setAttribute('aria-selected', !alt);
-  (alt ? runAlt : runXY)();
-}
-$('tab-alt').addEventListener('click', () => showTab('alt'));
-$('tab-xy').addEventListener('click', () => showTab('xy'));
-
-['c-z:tip-z', 'c-T:tip-T', 'c-xy1:tip-xy1', 'c-xy2:tip-xy2'].forEach(s => { const [c, t] = s.split(':'); bindHover($(c), t); });
-const redraw = () => { if (!$('view-alt').hidden) runAlt(); else runXY(); };
+['c-z:tip-z', 'c-T:tip-T'].forEach(s => { const [c, t] = s.split(':'); bindHover($(c), t); });
+const redraw = runAlt;
 new ResizeObserver(redraw).observe(document.querySelector('.app'));
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
 new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
